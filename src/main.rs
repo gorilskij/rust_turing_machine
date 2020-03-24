@@ -7,171 +7,12 @@ use regex::{Regex, Captures};
 use lazy_static::lazy_static;
 use std::fs;
 use gag::Gag;
+use enumerator::Enumerator;
+use enumerator::without_comments::IntoWithoutComments;
 
-#[derive(Eq, PartialEq, Debug, Display)]
-enum Dir { Left, Right, Stay }
+mod enumerator;
 
-impl From<char> for Dir {
-    fn from(c: char) -> Self {
-        use Dir::*;
-        match c {
-            'l' | 'L' => Left,
-            'r' | 'R' => Right,
-            '-' => Stay,
-            _ => panic!("Invalid character '{}'", c)
-        }
-    }
-}
 
-// alphabet and state set are implicit
-struct Enumerator {
-    tape: Vec<char>,
-    pos: usize,
-    state: String,
-    start_state: String,
-    // { state => { char => (write, go, new_state) } }
-    rules: HashMap<String, HashMap<char, (char, Dir, String)>>,
-}
-
-fn line_to_entry(line: &str) -> Result<(String, HashMap<char, (char, Dir, String)>), String> {
-    lazy_static! {
-        static ref STATE_RE: Regex = Regex::new(r"q([0-9A-Z]+)")
-            .map_err(|e| e.to_string())
-            .expect("Failed to build state regex");
-
-        static ref RULE_RE: Regex = Regex::new(r"([a-z0-9_])/([a-z0-9_]),([LR-])/q([0-9A-Z]+)")
-            .map_err(|e| e.to_string())
-            .expect("Failed to build rule regex");
-    }
-
-    let mut iter = line.splitn(2, ": ");
-    let state = STATE_RE
-        .captures(iter
-            .next()
-            .ok_or("No state")?)
-        .map(|c| c
-            .get(1)
-            .map(|m| m
-                .as_str()
-                .to_owned()))
-        .flatten()
-        .ok_or("Failed to match state")?;
-    let rest = iter
-        .next()
-        .ok_or(&format!("No rules for state '{}'", state))?;
-
-    let mut state_map = HashMap::new();
-    for rule in rest.split(' ') {
-        let rule_fail = format!("Failed to match rule '{}'", rule);
-
-        let caps = RULE_RE
-            .captures(rule)
-            .ok_or(&rule_fail.clone())?;
-
-        fn extract(caps: &Captures, index: usize, rule_fail: String) -> Result<char, String> {
-            caps
-                .get(index)
-                .map(|m| m
-                    .as_str()
-                    .chars()
-                    .nth(0))
-                .flatten()
-                .ok_or(rule_fail.clone())
-        }
-
-        let read = extract(&caps, 1, rule_fail.clone())?;
-        let write = extract(&caps, 2, rule_fail.clone())?;
-        let go = extract(&caps, 3, rule_fail.clone())?.into();
-        let new_state = caps
-            .get(4)
-            .map(|m| m
-                .as_str()
-                .to_owned())
-            .ok_or(&rule_fail.clone())?;
-
-        let old = state_map.insert(read, (write, go, new_state));
-        if let Some(_) = old {
-            return Err("Duplicate insertion".to_owned())
-        }
-    }
-
-    Ok((state, state_map))
-}
-
-impl Enumerator {
-    fn new<S0: ToString, S1: ToString>(rules_str: S0, start_state: S1) -> Result<Self, String> {
-        let mut rules: HashMap<String, HashMap<char, (char, Dir, String)>> = HashMap::new();
-        for line in rules_str.to_string().lines() {
-            let (k, v) = line_to_entry(line).unwrap();
-            rules.insert(k, v);
-        }
-
-        let mut start_state = start_state.to_string();
-        assert_eq!(start_state.chars().nth(0).unwrap(), 'q');
-        start_state.remove(0);
-
-        // todo run an integrity check
-
-        Ok(Self {
-            tape: vec![],
-            pos: 0,
-            state: start_state.clone(),
-            start_state,
-            rules,
-        })
-    }
-
-    // returns number of state transitions performed
-    fn run(&mut self, mut iterations: usize) -> usize {
-        let mut state_transitions = 0;
-        loop {
-            if self.state == "P".to_owned() {
-                println!("{}", self.tape.iter().collect::<String>().trim());
-                if iterations > 1 {
-                    iterations -= 1;
-                } else {
-                    break
-                }
-            }
-
-            let transition = self.rules
-                .get(&self.state)
-                .expect(&format!("state '{}' not found, bad TM", self.state));
-
-            let mut chr = self.tape
-                .get(self.pos)
-                .copied()
-                .unwrap_or(' ');
-
-            if chr == ' ' { chr = '_' }
-            let (write, dir, new_state) = transition
-                .get(&chr)
-                .expect(
-                    &format!("char '{}' not found for state '{}', bad TM", chr, self.state));
-
-            if self.tape.len() <= self.pos {
-                self.tape.resize(self.pos + 1, ' ');
-            }
-            self.tape[self.pos] = *write;
-            use Dir::*;
-            match dir {
-                Left => if self.pos > 0 { self.pos -= 1 },
-                Right => self.pos += 1,
-                Stay => (),
-            }
-            self.state = new_state.clone();
-
-            state_transitions += 1;
-        }
-        state_transitions
-    }
-
-    fn reset(&mut self) {
-        self.tape.clear();
-        self.pos = 0;
-        self.state = self.start_state.clone();
-    }
-}
 
 fn test_run(enumerator: &mut Enumerator, msg: &str, iterations: usize) {
     println!("--- start ({}) <{}> ---", msg, iterations);
@@ -181,32 +22,52 @@ fn test_run(enumerator: &mut Enumerator, msg: &str, iterations: usize) {
 }
 
 fn main() {
-    let small = fs::read_to_string("rulesets/0n1n_enumerator_small.txt")
-        .expect("failed to read file 1");
+    let enumerator_rules = fs::read_to_string("rulesets/comments_test_file.txt")
+        .expect("failed to read file");
 
-    let efficient = fs::read_to_string("rulesets/0n1n_enumerator_efficient.txt")
-        .expect("failed to read file 2");
+    let z = enumerator_rules
+        .chars()
+        .without_comments()
+        .map(|r| match r {
+            Err(e) => panic!("Parse error: {}", e),
+            Ok(c) => c,
+        })
+        .collect::<String>();
+    println!("--start--\n{}\n--end--", z);
 
-    let mut enumerator_small = Enumerator::new(small, "qP")
-        .expect("failed to create enumerator 1");
 
-    let mut enumerator_efficient = Enumerator::new(efficient, "qP")
-        .expect("failed to create enumerator 2");
+    // let enumerator_rules = fs::read_to_string("rulesets/0n1n_enumerator_small.txt")
+    //     .expect("failed to read file");
+    // let mut enumerator = Enumerator::new(enumerator_rules, "qP")
+    //     .expect("failed to build enumerator");
+    //
+    // enumerator.run(20);
 
+    // compare efficiency
+    // let small = fs::read_to_string("rulesets/0n1n_enumerator_small.txt")
+    //     .expect("failed to read file 1");
+    //
+    // let efficient = fs::read_to_string("rulesets/0n1n_enumerator_efficient.txt")
+    //     .expect("failed to read file 2");
+    //
+    // let mut enumerator_small = Enumerator::new(small, "qP")
+    //     .expect("failed to create enumerator 1");
+    //
+    // let mut enumerator_efficient = Enumerator::new(efficient, "qP")
+    //     .expect("failed to create enumerator 2");
     // note both functions grow kind-of quadratically (the simple one is more easily approximated)
     //  simple and efficient are equal at (0), 1, 2, and 4, otherwise (even at 3), efficient is faster
-
-    println!("{:>2}: {:>4} | {:>4}", "it", "smol", "fcnt");
-    for i in 0..500 {
-        enumerator_small.reset();
-        enumerator_efficient.reset();
-        let (s, e);
-        {
-            let _gag = Gag::stdout().unwrap();
-            s = enumerator_small.run(i);
-            e = enumerator_efficient.run(i);
-        }
-        // println!("{:>2}: {:>4} | {:>4}", i, s, e);
-        println!("{}, {}, {}", i, s, e);
-    }
+    // println!("{:>2}: {:>4} | {:>4}", "it", "smol", "fcnt");
+    // for i in 0..500 {
+    //     enumerator_small.reset();
+    //     enumerator_efficient.reset();
+    //     let (s, e);
+    //     {
+    //         let _gag = Gag::stdout().unwrap();
+    //         s = enumerator_small.run(i);
+    //         e = enumerator_efficient.run(i);
+    //     }
+    //     // println!("{:>2}: {:>4} | {:>4}", i, s, e);
+    //     println!("{}, {}, {}", i, s, e);
+    // }
 }
