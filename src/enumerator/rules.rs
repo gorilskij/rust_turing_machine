@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use crate::enumerator::Dir;
-use std::collections::hash_map::{RandomState, Entry, OccupiedEntry};
+use std::collections::hash_map::Entry;
 use std::ops::Deref;
 use bimap::BiMap;
 use super::bientry::GetBiEntry;
@@ -77,7 +77,7 @@ impl Rules {
 
         let sub_map = self.map
             .entry(from_state)
-            .or_insert(HashMap::new());
+            .or_insert_with(HashMap::new);
 
         match sub_map.entry(read) {
             Entry::Occupied(_) => panic!("Duplicate entry {:?}", dbg),

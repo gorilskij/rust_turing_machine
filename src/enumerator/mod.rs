@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-use lazy_static::lazy_static;
 use without_comments::IntoWithoutComments;
 use std::str::FromStr;
 use crate::enumerator::rules::{Rules, Symbol, State};
@@ -37,6 +35,7 @@ pub struct Enumerator {
     rules: Rules,
 }
 
+#[allow(dead_code)]
 impl Enumerator {
     // todo run an integrity check
     pub fn from_string(string: String, start_state: String, print_state: String) -> Self {
@@ -46,7 +45,7 @@ impl Enumerator {
 
         // [qA, r, w, g, qB] (gets cleared after each iteration)
         let mut partial = Vec::with_capacity(5);
-        let mut iter = &mut string.chars().without_comments().peekable();
+        let iter = &mut string.chars().without_comments().peekable();
 
         'outer: loop {
             for _ in 0..5 {
@@ -107,19 +106,14 @@ impl Enumerator {
                 }
             }
 
-            let transition = self.rules
-                .get(&self.state)
-                .expect(&format!("state '{}' not found, bad TM", self.state));
-
-            let mut chr = self.tape
+            let read = self.tape
                 .get(self.pos)
                 .copied()
                 .unwrap_or(0);
 
-            let (write, dir, new_state) = transition
-                .get(&chr)
-                .expect(
-                    &format!("char {:?} not found for state '{}', bad TM", chr, self.state));
+            let (write, dir, new_state) = self.rules.lookup(self.state, read)
+                .unwrap_or_else(||
+                    panic!("char {:?} not found for state '{}', bad TM", read, self.state));
 
             if self.tape.len() <= self.pos {
                 self.tape.resize(self.pos + 1, 0);
@@ -131,7 +125,7 @@ impl Enumerator {
                 Right => self.pos += 1,
                 Stay => (),
             }
-            self.state = new_state.clone();
+            self.state = *new_state;
 
             state_transitions += 1;
         }
@@ -141,6 +135,6 @@ impl Enumerator {
     fn reset(&mut self) {
         self.tape.clear();
         self.pos = 0;
-        self.state = self.start_state.clone();
+        self.state = self.start_state;
     }
 }

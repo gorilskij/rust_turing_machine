@@ -5,7 +5,7 @@ use std::hash::Hash;
 pub enum BiEntry<'a, L, R> {
     Vacant(&'a mut BiMap<L, R>, L),
     Occupied(&'a mut BiMap<L, R>, L),
-    Phantom(PhantomData<R>),
+    #[allow(dead_code)] Phantom(PhantomData<R>),
 }
 
 impl<'a, L, R> BiEntry<'a, L, R>
@@ -39,7 +39,7 @@ impl<'a, L, R> GetBiEntry<'a, L, R> for BiMap<L, R>
     fn entry(&'a mut self, left: L) -> BiEntry<'a, L, R> {
         match self.get_by_left(&left) {
             None => BiEntry::Vacant(self, left),
-            Some(right) => BiEntry::Occupied(self, left),
+            Some(_) => BiEntry::Occupied(self, left), // keeping right would be efficient but dangerous
         }
     }
 }
