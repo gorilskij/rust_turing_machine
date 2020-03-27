@@ -1,6 +1,7 @@
 #![feature(option_expect_none)]
 
 #[macro_use] extern crate derive_more;
+#[macro_use] extern crate getset;
 
 use std::collections::HashMap;
 use regex::{Regex, Captures};
@@ -8,7 +9,7 @@ use lazy_static::lazy_static;
 use std::fs;
 use gag::Gag;
 use enumerator::Enumerator;
-use enumerator::without_comments::IntoWithoutComments;
+use without_comments::IntoWithoutComments;
 
 mod enumerator;
 
@@ -22,19 +23,14 @@ fn test_run(enumerator: &mut Enumerator, msg: &str, iterations: usize) {
 }
 
 fn main() {
-    let enumerator_rules = fs::read_to_string("rulesets/comments_test_file.txt")
-        .expect("failed to read file");
+    let rules = fs::read_to_string("rulesets/0n1n_enumerator_small.txt").unwrap();
+    let mut e = Enumerator::from_string(
+        rules,
+        "qP".to_owned(),
+        "qP".to_owned()
+    );
 
-    let z = enumerator_rules
-        .chars()
-        .without_comments()
-        .map(|r| match r {
-            Err(e) => panic!("Parse error: {}", e),
-            Ok(c) => c,
-        })
-        .collect::<String>();
-    println!("--start--\n{}\n--end--", z);
-
+    e.run(10);
 
     // let enumerator_rules = fs::read_to_string("rulesets/0n1n_enumerator_small.txt")
     //     .expect("failed to read file");

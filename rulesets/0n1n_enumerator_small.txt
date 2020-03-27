@@ -1,20 +1,22 @@
 // Syntax:
-// current_state, read_symbol -> write_symbol, go_direction -> new_state
-// '/' can be used instead of '->'
-// go_direction: </-/> or L/-/R
 // '// comment' and '/* comment */' are comments
+// qA r w g qB
+// where
+//     qA, qB are states
+//     r = symbol read
+//     w = symbol to be written
+//     g = direction to go (</-/> or L/-/R or l/-/r)
+//     _ represents a space
 
-qP:
-_ -> 0, R -> q0
-1 -> 1, L -> q1
+qP _ 0 R q0
+qP 1 1 L q1
 
-q0:
-_/1,-/qP
+q0 _ 1 - qP
 
-q1:
-1/1,L/q1 0/0,R/q2
+q1 1 1 L q1
+q1 0 0 R q2
 
-q2: 1/0,R/q3
-q3: 1/1,R/q3 _/1,R/q0
+q2 1 0 R q3
 
-last?
+q3 1 1 R q3
+q3 _ 1 R q0
