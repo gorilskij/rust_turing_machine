@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::enumerator::Dir;
 use std::collections::hash_map::Entry;
 use std::ops::Deref;
@@ -28,6 +28,13 @@ impl Deref for Rules {
     }
 }
 
+pub enum Tresult<T, E, W> {
+    Ok(T),
+    Err(E),
+    Warn(W),
+}
+
+// todo warn about inconsistent direction notation (</l/L and >/r/R)
 impl Rules {
     pub fn insert(
         &mut self,
@@ -99,5 +106,79 @@ impl Rules {
 
     pub fn lookup(&self, state: State, read: Symbol) -> Option<&(Symbol, Dir, State)> {
         self.map.get(&state)?.get(&read)
+    }
+
+    pub fn integrity_check(
+        &self,
+        start_state: State,
+        print_state: State
+    ) -> Tresult<(), String, String> {
+        let input_states: HashSet<State> = self.map
+            .keys()
+            .copied()
+            .collect();
+
+        if !input_states.contains(&start_state) {
+            return Tresult::Err("Input state is not a valid state".to_string())
+        }
+
+        let output_states: HashSet<State> = self.map
+            .values()
+            .flat_map(|m| m
+                .values()
+                .map(|(_, _, o)| *o))
+            .collect();
+
+        if !output_states.contains(&print_state) {
+            return if start_state == print_state {
+                Tresult::Warn(format!(
+                    "Print state '{}' will only be entered once at the start of execution",
+                    print_state
+                ))
+            } else {
+                Tresult::Warn(format!("Print state '{}' will never be entered", print_state))
+            }
+        }
+
+        if input_states != output_states {
+            let input_minus_output: HashSet<State> = input_states
+                .difference(&output_states)
+                .copied()
+                .collect();
+
+            if !input_minus_output.is_empty() {
+                if input_minus_output.len() == 1 {
+                    if input_minus_output.contains(&start_state) {
+                        /* ok, start state will only ever be visited once */
+                    } else {
+                        return Tresult::Warn(format!(
+                            "There is an unvisitable input state: {}",
+                            input_minus_output.iter().next().unwrap()
+                        ))
+                    }
+                } else {
+                    return Tresult::Warn(format!(
+                        "There are {} unvisitable input states: {:?}",
+                        input_minus_output.len(),
+                        input_minus_output,
+                    ))
+                }
+            } else {
+                let output_minus_input: HashSet<State> = output_states
+                    .difference(&input_states)
+                    .copied()
+                    .collect();
+
+                // todo account for halting states here
+                if !output_minus_input.is_empty() {
+                    return Tresult::Err(format!(
+                        "More output states than input states, these states will crash the \
+                        machine as soon as they're reached: {:?}", output_minus_input
+                    ))
+                }
+            }
+        }
+
+        Tresult::Ok(())
     }
 }

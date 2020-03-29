@@ -40,7 +40,7 @@ dependencies = [
  "derive_more",
  "getset",
  "itertools",
- "without_comments",
+ "no-comment",
 ]
 
 [[package]]
@@ -63,6 +63,12 @@ checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
 dependencies = [
  "either",
 ]
+
+[[package]]
+name = "no-comment"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b3faba8f4e64ebabd6fa4aa749e1e911ad52fbf2ca5ebf8d6270b4f44016af3"
 
 [[package]]
 name = "proc-macro-error"
@@ -141,7 +147,3 @@ name = "version_check"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "078775d0255232fb988e6fccf26ddc9d1ac274299aaedcedce21c6f72cc533ce"
-
-[[package]]
-name = "without_comments"
-version = "0.0.1"

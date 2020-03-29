@@ -1,6 +1,6 @@
-use without_comments::IntoWithoutComments;
+use no_comment::IntoWithoutComments;
 use std::str::FromStr;
-use crate::enumerator::rules::{Rules, Symbol, State};
+use crate::enumerator::rules::{Rules, Symbol, State, Tresult};
 use itertools::Itertools;
 use std::borrow::Borrow;
 
@@ -39,8 +39,6 @@ pub struct Enumerator {
 impl Enumerator {
     // todo run an integrity check
     pub fn from_string(string: String, start_state: String, print_state: String) -> Self {
-        println!("input:\n--\n{}\n--", string);
-
         let mut rules = Rules::default();
 
         // [qA, r, w, g, qB] (gets cleared after each iteration)
@@ -68,6 +66,12 @@ impl Enumerator {
         let start_state = *rules.states().get_by_left(&start_state).unwrap();
         let print_state = *rules.states().get_by_left(&print_state).unwrap();
 
+        match rules.integrity_check(start_state, print_state) {
+            Tresult::Ok(()) => (),
+            Tresult::Err(s) => panic!("{}", s),
+            Tresult::Warn(s) => eprintln!("Warning: {}", s),
+        }
+
         Self {
             tape: vec![],
             pos: 0,
@@ -79,7 +83,7 @@ impl Enumerator {
     }
 
     // returns number of state transitions performed
-    pub(crate) fn run(&mut self, mut iterations: usize) -> usize {
+    pub fn run(&mut self, mut iterations: usize) -> usize {
         let mut state_transitions = 0;
         loop {
             if let Some(print_state) = self.print_state {
@@ -132,7 +136,7 @@ impl Enumerator {
         state_transitions
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.tape.clear();
         self.pos = 0;
         self.state = self.start_state;
