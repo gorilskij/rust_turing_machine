@@ -3,12 +3,12 @@ extern crate derive_more;
 #[macro_use]
 extern crate getset;
 
-use enumerator::Enumerator;
+use turing_machine::TM;
 
-mod enumerator;
+mod turing_machine;
 
 fn main() {
-    let mut e = Enumerator::from_file("rulesets/0n1n_enumerator_efficient.txt");
+    let mut e = TM::from_file("rulesets/0n1n_enumerator_efficient.txt");
 
     e.run(10);
 }
