@@ -1,9 +1,24 @@
-qP: _/0,R/q0 0/0,R/q1 1/1,R/q4
-q0: _/1,L/qP
-q1: 1/0,R/q2
-q2: 1/1,R/q2, _/1,R/q3
-q3: _/1,-/qP
-q4: _/1,R/q5
-q5: _/1,L/q6
-q6: 1/1,L/q6 0/0,R/q7
-q7: 1/0,-/qP
+start_state: qP
+print_state: qP
+
+qP _ 0 R q0
+qP 0 0 R q1
+qP 1 1 R q4
+
+q0 _ 1 L qP
+
+q1 1 0 R q2
+
+q2 1 1 R q2
+q2 _ 1 R q3
+
+q3 _ 1 - qP
+
+q4 _ 1 R q5
+
+q5 _ 1 L q6
+
+q6 1 1 L q6
+q6 0 0 R q7
+
+q7 1 0 - qP

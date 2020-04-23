@@ -1,24 +1,28 @@
-use no_comment::IntoWithoutComments;
-use std::str::FromStr;
-use crate::enumerator::rules::{Rules, Symbol, State, Tresult};
+use crate::enumerator::rules::{Rules, State, Symbol, Tresult};
 use itertools::Itertools;
 use std::borrow::Borrow;
+use std::path::Path;
+use std::str::FromStr;
 
+mod entry;
 mod rules;
-mod bientry;
 
 #[derive(Eq, PartialEq, Debug, Display)]
-pub enum Dir { Left, Right, Stay }
+pub enum Dir {
+    Left,
+    Right,
+    Stay,
+}
 
 impl FromStr for Dir {
-    type Err = ();
+    type Err = (); // eh
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use Dir::*;
         match s {
             "l" | "L" | "<" => Ok(Left),
             "r" | "R" | ">" => Ok(Right),
-            "-" => Ok(Stay),
+            "-" | "_" => Ok(Stay),
             _ => Err(()),
         }
     }
@@ -37,47 +41,20 @@ pub struct Enumerator {
 
 #[allow(dead_code)]
 impl Enumerator {
-    // todo run an integrity check
-    pub fn from_string(string: String, start_state: String, print_state: String) -> Self {
-        let mut rules = Rules::default();
-
-        // [qA, r, w, g, qB] (gets cleared after each iteration)
-        let mut partial = Vec::with_capacity(5);
-        let iter = &mut string.chars().without_comments().peekable();
-
-        'outer: loop {
-            for _ in 0..5 {
-                let _: String = iter
-                    .peeking_take_while(|c| c.is_whitespace())
-                    .collect();
-                let s: String = iter
-                    .peeking_take_while(|&c| !c.is_whitespace())
-                    .collect();
-
-                if s.is_empty() {
-                    break 'outer
-                }
-
-                partial.push(s);
-            }
-            rules.insert_vec(&mut partial)
-        }
-
-        let start_state = *rules.states().get_by_left(&start_state).unwrap();
-        let print_state = *rules.states().get_by_left(&print_state).unwrap();
-
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Self {
+        let string = std::fs::read_to_string(path).unwrap();
+        let (rules, start_state, print_state) = Rules::from_string(string);
         match rules.integrity_check(start_state, print_state) {
             Tresult::Ok(()) => (),
             Tresult::Err(s) => panic!("{}", s),
             Tresult::Warn(s) => eprintln!("Warning: {}", s),
         }
-
         Self {
             tape: vec![],
             pos: 0,
             state: start_state,
             start_state,
-            print_state: Some(print_state),
+            print_state,
             rules,
         }
     }
@@ -88,36 +65,34 @@ impl Enumerator {
         loop {
             if let Some(print_state) = self.print_state {
                 if self.state == print_state {
-                    let tape_string = self.tape
+                    let tape_string = self
+                        .tape
                         .iter()
                         .map(|i| match i {
                             0 => "",
-                            j => self.rules
-                                .symbols()
-                                .get_by_right(j)
-                                .unwrap()
-                                .borrow(),
+                            j => self.rules.symbols().get_by_right(j).unwrap().borrow(),
                         })
-                        .intersperse("|") // todo skip this step if all symbols are 1-char long
+                        .intersperse("|")
                         .collect::<String>();
 
                     println!("{}", tape_string.trim());
                     if iterations > 1 {
                         iterations -= 1;
                     } else {
-                        break
+                        break;
                     }
                 }
             }
 
-            let read = self.tape
-                .get(self.pos)
-                .copied()
-                .unwrap_or(0);
+            let read = self.tape.get(self.pos).copied().unwrap_or(0);
 
-            let (write, dir, new_state) = self.rules.lookup(self.state, read)
-                .unwrap_or_else(||
-                    panic!("char {:?} not found for state '{}', bad TM", read, self.state));
+            let (write, dir, new_state) =
+                self.rules.lookup(self.state, read).unwrap_or_else(|| {
+                    panic!(
+                        "char {:?} not found for state '{}', bad TM",
+                        read, self.state
+                    )
+                });
 
             if self.tape.len() <= self.pos {
                 self.tape.resize(self.pos + 1, 0);
@@ -125,7 +100,11 @@ impl Enumerator {
             self.tape[self.pos] = *write;
             use Dir::*;
             match dir {
-                Left => if self.pos > 0 { self.pos -= 1 },
+                Left => {
+                    if self.pos > 0 {
+                        self.pos -= 1
+                    }
+                }
                 Right => self.pos += 1,
                 Stay => (),
             }

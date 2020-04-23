@@ -5,8 +5,14 @@
 //     qA, qB are states
 //     r = symbol read
 //     w = symbol to be written
-//     g = direction to go (</-/> or L/-/R or l/-/r)
+//     g = direction to go ({<, l, L}/{-, _}/{>, r, R})
 //     _ represents a space
+//
+// start_state: q0 is required
+// print_state: qP is optional
+
+start_state: qP
+print_state: qP
 
 qP _ 0 R q0
 qP 1 1 L q1

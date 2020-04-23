@@ -1,0 +1,3 @@
+start_state: q0
+print_state: qP
+q0 _ _ _ qA
